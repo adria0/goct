@@ -25,9 +25,10 @@ func DisplayDot(dot []byte) error {
 	return nil
 }
 func main() {
-	rx := NewRadixGraph(2818170175, 7)
+	rx := NewRadixGraph(9182, 7)
 	if err := DisplayDot(rx.CreateDot()); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("value is %v", rx.CalcCT())
+	fmt.Printf("value is %v\n", rx.CalcCT())
+	rx.CreateCode()
 }
