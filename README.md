@@ -1,6 +1,6 @@
-# golang-ct
+# goct
 
-[![Build Status](https://travis-ci.org/amassanet/golang-ct.svg?branch=master)](https://travis-ci.org/amassanet/golang-ct)
+[![Build Status](https://travis-ci.org/amassanet/goct.svg?branch=master)](https://travis-ci.org/amassanet/goct)
 
 Collberg-Thomborson Raddix Dynamic Graph Watermarking algorithm
 
