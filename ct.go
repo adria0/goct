@@ -1,4 +1,4 @@
-package main
+package goct
 
 /*
    Collberg-Thomborson Raddix Watermarking algorithm

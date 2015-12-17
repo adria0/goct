@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/amassanet/goct"
 	"io/ioutil"
 	"log"
 	"os"
@@ -25,7 +26,7 @@ func DisplayDot(dot []byte) error {
 	return nil
 }
 func main() {
-	rx := NewRadixGraph(9182, 7)
+	rx := goct.NewRadixGraph(9182, 7)
 	if err := DisplayDot(rx.CreateDot()); err != nil {
 		log.Fatal(err)
 	}
