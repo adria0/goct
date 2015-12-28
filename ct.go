@@ -12,7 +12,7 @@ import (
 )
 
 type N struct {
-	id string
+	Id int
 	v  []*N
 }
 
@@ -48,7 +48,7 @@ func NewRadixGraph(value int, radix int) *RadixGraph {
 	rg := RadixGraph{make([]N, nodecount), radix}
 
 	for c := 0; c < nodecount; c++ {
-		rg.nodes[c].id = fmt.Sprintf("id%v", c)
+		rg.nodes[c].Id = c
 	}
 
 	valuecopy = value
@@ -93,72 +93,100 @@ func (rg *RadixGraph) CalcCT() int {
 }
 
 type PendingAssigment struct {
-	from    *N
-	to      *N
-	toIndex int
+	src      *N
+	dst      *N
+	dstIndex int
 }
 
-func dump(aliases map[*N]string, pas []PendingAssigment) {
-	for _, pa := range pas {
-		fmt.Printf("// pending %v[%v] = %v\n", pa.to.id, pa.toIndex, pa.from.id)
-	}
-	for node, alias := range aliases {
-		fmt.Printf("// alias   %v -> %v\n", node.id, alias)
-	}
-	fmt.Printf("\n")
+type VarExpr struct {
+	Node    *N
+	Indexes []int
+}
+
+type AssigStmt struct {
+	Src VarExpr
+	Dst VarExpr
+}
+
+type NewNodeStmt struct {
+	Node *N
+}
+
+type Stmt struct {
+	Newnode *NewNodeStmt
+	Assig   *AssigStmt
 }
 
 // Create pseudocode to create the Radix Graph preserving
 //   the order, defering the creation of inexistent nodes
 //   to the moment of existance
-func (rg *RadixGraph) CreateCode() {
+func (rg *RadixGraph) CreateCode() []Stmt {
+
+	stmts := make([]Stmt, 0)
 
 	pending := make([]PendingAssigment, 0)
-	aliases := make(map[*N]string)
+	aliases := make(map[int]VarExpr)
 
 	for n := 0; n < len(rg.nodes); n++ {
-		fmt.Printf("var id%v N\n", n)
-		aliases[&(rg.nodes[n])] = rg.nodes[n].id
+		node := &(rg.nodes[n])
+		stmts = append(stmts, Stmt{Newnode: &NewNodeStmt{node}})
+
+		aliases[node.Id] = VarExpr{node, []int{}}
 		for v := 0; v < len(rg.nodes[n].v); v++ {
 			// write assigment alias(n[c]).v[n] =  alias(n[c].v[n])
-			added := false
-			if from, hasfrom := aliases[rg.nodes[n].v[v]]; hasfrom {
-				if to, hasto := aliases[&(rg.nodes[n])]; hasto {
-					fmt.Printf("%v.v[%v] = %v\n", to, v, from)
-					added = true
+
+			if src, hassrc := aliases[node.v[v].Id]; hassrc {
+				if dst, hasdst := aliases[node.Id]; hasdst {
+					dst = VarExpr{dst.Node, append(dst.Indexes, v)}
+					stmts = append(stmts, Stmt{Assig: &AssigStmt{
+						Src: src,
+						Dst: dst,
+					}})
+					continue
 				}
 			}
-			if !added {
-				// cannot be added at this time, defer assigment until all info is present
-				pending = append(pending, PendingAssigment{
-					from:    rg.nodes[n].v[v],
-					to:      &(rg.nodes[n]),
-					toIndex: v,
-				})
-				// but assign to itself to not reveal information about
-				// node construction. it could be improved to assign to
-				// an existing random node
-				fmt.Printf("%v.v[%v] = %v\n", rg.nodes[n].id, v, rg.nodes[n].id)
-			}
+			// cannot be added at this time, defer assigment until all info is present
+			pending = append(pending, PendingAssigment{
+				src:      node.v[v],
+				dst:      node,
+				dstIndex: v,
+			})
+			// but assign to itself to not reveal information about
+			// node construction. it could be improved to assign to
+			// an existing random node
+			// fmt.Printf("%v.v[%v] = %v\n", rg.nodes[n].Id, v, rg.nodes[n].Id)
 		}
 
 		// check pending assigments and create code for it variables are
 		//   available. downward loop for preserving slice when removing element
 		for p := len(pending) - 1; p >= 0; p-- {
-			if from, hasfrom := aliases[pending[p].from]; hasfrom {
-				if to, hasto := aliases[pending[p].to]; hasto {
-					fmt.Printf("%v.v[%v] = %v\n", to, pending[p].toIndex, from)
+			if src, hassrc := aliases[pending[p].src.Id]; hassrc {
+				if dst, hasdst := aliases[pending[p].dst.Id]; hasdst {
+
+					newindex := make([]int, len(dst.Indexes), 1+len(dst.Indexes))
+					copy(newindex, dst.Indexes)
+					newindex = append(newindex, pending[p].dstIndex)
+					dst = VarExpr{dst.Node, newindex}
+
+					stmts = append(stmts, Stmt{Assig: &AssigStmt{
+						Src: src,
+						Dst: dst,
+					}})
+
 					pending = append(pending[:p], pending[p+1:]...)
+					if dst.Node.Id == rg.nodes[0].Id && len(src.Indexes) == 0 {
+						aliases[src.Node.Id] = dst
+					}
 				}
 			}
 		}
-
-		dump(aliases, pending)
 	}
 
 	if len(pending) > 0 {
 		log.Fatal("Oops! Algorithm failed! Pending assigment list > 0!")
 	}
+
+	return stmts
 }
 
 // Create graphviz http://www.graphviz.org/ graph
@@ -167,7 +195,8 @@ func (rg *RadixGraph) CreateDot() []byte {
 	b.WriteString("digraph G {")
 	for n := 0; n < len(rg.nodes); n++ {
 		for v := 0; v < len(rg.nodes[n].v); v++ {
-			line := fmt.Sprintf("%v -> %v [label=%v]\n", rg.nodes[n].id, rg.nodes[n].v[v].id, v)
+			line := fmt.Sprintf("%v -> %v [label=%v]\n", rg.nodes[n].Id, rg.nodes[n].v[v].Id, v)
+
 			b.WriteString(line)
 		}
 	}
