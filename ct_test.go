@@ -13,13 +13,13 @@ func Assert(t *testing.T, what string, assertion bool) {
 }
 
 func TestCodeCreation(t *testing.T) {
-	testCodeCreationWithNumberAndRadix(t, 2918, 5)
+	testCodeCreationWithNumberAndRadixAndSeed(t, 912918, 3, 8)
 }
 
-func testCodeCreationWithNumberAndRadix(t *testing.T, number int, radix int) {
+func testCodeCreationWithNumberAndRadixAndSeed(t *testing.T, number int, radix int, seed int64) {
 
 	rx := NewRadixGraph(number, radix)
-	stmts := rx.CreateCode()
+	stmts := rx.CreateCode(seed)
 
 	var b bytes.Buffer
 

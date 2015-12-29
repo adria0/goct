@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"math/rand"
 )
 
 type N struct {
@@ -119,42 +120,62 @@ type Stmt struct {
 
 // Create pseudocode to create the Radix Graph preserving
 //   the order, defering the creation of inexistent nodes
-//   to the moment of existance
-func (rg *RadixGraph) CreateCode() []Stmt {
+//   to the moment of existance.
+func (rg *RadixGraph) CreateCode(seed int64) []Stmt {
 
+	// Shuffle the nodes tho create some random code
+	//  we fix the first node because is needed when
+	//  rebuilding the graph starting from id0
+
+	rand := rand.New(rand.NewSource(seed))
+	permutation := rand.Perm(len(rg.nodes) - 1)
+	permutatedNodes := make([]*N, len(rg.nodes))
+	permutatedNodes[0] = &(rg.nodes[0])
+	for n := 0; n < len(rg.nodes)-1; n++ {
+		permutatedNodes[n+1] = &(rg.nodes[permutation[n]+1])
+	}
+
+	// Statements = LOCs
 	stmts := make([]Stmt, 0)
 
+	// Pending assigments to be resolved later
 	pending := make([]PendingAssigment, 0)
+
+	// Aliases are nodes that could be rewritten in terms of id0
 	aliases := make(map[int]VarExpr)
 
-	for n := 0; n < len(rg.nodes); n++ {
-		node := &(rg.nodes[n])
+	for n := 0; n < len(permutatedNodes); n++ {
+		node := permutatedNodes[n]
 		stmts = append(stmts, Stmt{Newnode: &NewNodeStmt{node}})
 
 		aliases[node.Id] = VarExpr{node, []int{}}
-		for v := 0; v < len(rg.nodes[n].v); v++ {
-			// write assigment alias(n[c]).v[n] =  alias(n[c].v[n])
+		for v := 0; v < len(node.v); v++ {
 
+			// Write assigment alias(n[c]).v[n] =  alias(n[c].v[n])
 			if src, hassrc := aliases[node.v[v].Id]; hassrc {
 				if dst, hasdst := aliases[node.Id]; hasdst {
-					dst = VarExpr{dst.Node, append(dst.Indexes, v)}
+
+					newindex := make([]int, len(dst.Indexes), 1+len(dst.Indexes))
+					copy(newindex, dst.Indexes)
+					newindex = append(newindex, v)
+
+					dst = VarExpr{dst.Node, newindex}
 					stmts = append(stmts, Stmt{Assig: &AssigStmt{
 						Src: src,
 						Dst: dst,
 					}})
+
 					continue
 				}
 			}
-			// cannot be added at this time, defer assigment until all info is present
+
+			// Cannot be added at this time, defer assigment until all info is present
 			pending = append(pending, PendingAssigment{
 				src:      node.v[v],
 				dst:      node,
 				dstIndex: v,
 			})
-			// but assign to itself to not reveal information about
-			// node construction. it could be improved to assign to
-			// an existing random node
-			// fmt.Printf("%v.v[%v] = %v\n", rg.nodes[n].Id, v, rg.nodes[n].Id)
+
 		}
 
 		// check pending assigments and create code for it variables are
@@ -174,7 +195,7 @@ func (rg *RadixGraph) CreateCode() []Stmt {
 					}})
 
 					pending = append(pending[:p], pending[p+1:]...)
-					if dst.Node.Id == rg.nodes[0].Id && len(src.Indexes) == 0 {
+					if dst.Node.Id == permutatedNodes[0].Id && len(src.Indexes) == 0 {
 						aliases[src.Node.Id] = dst
 					}
 				}
