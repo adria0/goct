@@ -1,6 +1,6 @@
 # goct
 
-[![Build Status](https://travis-ci.org/amassanet/goct.svg?branch=master)](https://travis-ci.org/amassanet/goct)
+[![Build Status](https://travis-ci.org/adriamb/goct.svg?branch=master)](https://travis-ci.org/adriamb/goct)
 
 Collberg-Thomborson Raddix Dynamic Graph Watermarking algorithm
 
